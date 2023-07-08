@@ -1,0 +1,207 @@
+# My request chaining for REST Client (VS Code extension)
+# =======================================================
+
+@host = http://127.0.0.1:8000/
+@user_password = secret13
+# @user_name = achekhov
+@user_name = ikruglov
+
+### Create user through API (Djoser + JWT)
+# @name create_user
+POST {{ host }}auth/users/
+Content-Type: application/json
+
+{
+  "username": "{{ user_name }}",
+  "password": "{{ user_password }}"
+}
+
+### Obtain users token (Djoser + JWT)
+# @name request_user_token
+POST {{ host }}auth/jwt/create/
+Content-Type: application/json
+
+{
+    "username": "{{ user_name }}",
+    "password": "{{ user_password }}"
+}
+
+# user_name = achekhov
+# {
+#   "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTY4ODQ5NDE4MCwianRpIjoiNjExY2JiODFkZGY5NGU3NDk0NmUzNWQyYTFjYjYyMWEiLCJ1c2VyX2lkIjoxfQ.KoK7BbFksl3RbwdsoBdpHHGR6lNLreA4HWsZtyaRyxk",
+#   "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjg4NDk0MTgwLCJqdGkiOiJlNDRlNmI5MWI3ZWI0MTk4OWZkMjliZDRhZTY3ZDdlMyIsInVzZXJfaWQiOjF9.Vh-53Y6YgcimI3bvjcpDTZKeG4WcY4o-bXSBVjj7-gU"
+# }
+
+# user_name = ikruglov
+# {
+#   "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTY4ODQ5NzUyNywianRpIjoiODA2YzdlNjBlMTE4NGRiNDk1YWEwNjM5ZmY1MjUwMTIiLCJ1c2VyX2lkIjoyfQ.c4auP5M2hkpUDveyhAAS27zbMxaoOlo3F6s-9H20-t4",
+#   "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjg4NDk3NTI3LCJqdGkiOiJkNWI0NDRiNmUwM2E0YjEwYTkwYWVlY2Y4ZDZlNTYyMyIsInVzZXJfaWQiOjJ9.VMhfA-N1cmKjveP3gYMbIP-NotAWW-_bagG-zj7hU3U"
+# }
+
+### Extract the access token from the response and use it in the next request
+@access_user_token = {{ request_user_token.response.body.access }}
+
+### Get the list of cats using the extracted users token
+GET {{ host }}cats/
+# Authorization: Bearer {{ access_user_token }}
+
+### Get the list of users using the extracted users token
+GET {{ host }}users/
+Authorization: Bearer {{ access_user_token }}
+
+### Get the list of achievements using the extracted users token
+GET {{ host }}achievements/
+Authorization: Bearer {{ access_user_token }}
+
+
+### Get one User object
+GET {{ host }}users/1/
+Authorization: Bearer {{ access_user_token }}
+
+### Get one Cat object
+GET {{ host }}cats/1/
+# Authorization: Bearer {{ access_user_token }}
+
+
+### Create one Cat object (with CHOICES)
+POST {{ host }}cats/
+Content-Type: application/json
+Authorization: Bearer {{ access_user_token }}
+
+{
+    "name": "Bulochka",
+    "color": "Ginger",
+    "birth_year": 2005,
+    "owner": 2,
+    "achievements": [
+        {"achievement_name": "поймал мышку"},
+        {"achievement_name": "разбил вазу"}
+    ]
+}
+
+# IsAuthenticatedOrReadOnly
+### Get the list of cats using the extracted users token
+GET {{ host }}cats/
+
+
+# Test custom permission (from user ikruglov try to change
+#  achekhov cat
+###
+PATCH  {{ host }}cats/1/
+Content-Type: application/json
+Authorization: Bearer {{ access_user_token }}
+
+{
+    "birth_year": 1666
+}
+
+# Test custom permission (from user ikruglov try to delete
+#  achekhov cat
+###
+DELETE {{ host }}cats/1/
+Authorization: Bearer {{ access_user_token }}
+
+
+# LimitOffsetPagination
+### Get the list of cats with number of return obj = limit and start from obj = offset
+# offset = 0 is the first obj
+GET {{ host }}cats/?limit=2&offset=0
+
+
+# Фильтрация: бэкенд DjangoFilterBackend
+### Get the list of all Black cats
+GET {{ host }}cats/?color=Black
+
+# Поиск: бэкенд SearchFilter
+### Get the list of all cats which names contain 'bul' (case-insensitive)
+GET {{ host }}cats/?search=bul
+
+# Поиск: бэкенд SearchFilter
+### Можно искать по нескольким совпадениям: в запросе их надо разделить запятыми, без пробелов.
+# В выдачу попадут только те котики, где есть одновременно все совпадения, например — «Кеша».
+GET {{ host }}cats/?search=К,ша
+
+# Сортировка выдачи: бэкенд OrderingFilter
+### Get the list of all cats ordered by name (reversed is -name)
+GET {{ host }}cats/?ordering=name
+
+### Get the list of all cats ordered by name and birth_year
+GET {{ host }}cats/?ordering=name,birth_year
+
+
+
+
+
+
+
+### Get the list of groups using the extracted token of user achekhov
+GET {{ host }}groups/
+Authorization: Token {{ achekhov_token }}
+
+### Add the new group using the extracted token of user achekhov
+# @name create_new_group
+POST {{ host }}groups/
+Authorization: Token {{ achekhov_token }}
+Content-Type: application/json
+
+{
+    "title": "Математика",
+    "slug": "math",
+    "description": "Посты на тему математики"
+} 
+
+### Extract the group ID from the response and use it in the next request
+@new_group_id = {{ create_new_group.response.body.id }}
+
+### Get the group detail from the previous request
+GET {{ host }}groups/{{ new_group_id }}/
+Authorization: Token {{ achekhov_token }}
+
+### Add the new post using the extracted token of user achekhov
+# @name create_new_post
+POST {{ host }}posts/
+Authorization: Token {{ achekhov_token }}
+Content-Type: application/json
+
+{
+    "text": "Вечером собрались в редакции «Русской мысли», чтобы поговорить о народном театре. Проект Шехтеля всем нравится.",
+    "group": 1
+}
+
+### Extract the post ID from the response and use it in the next request
+@new_post_id = {{ create_new_post.response.body.id }}
+
+### Add the comment to the post from previous request
+# @name create_new_comment
+POST {{ host }}posts/{{ new_post_id }}/comments/
+Authorization: Token {{ achekhov_token }}
+Content-Type: application/json
+
+{
+    "text": "Comment3 text"
+}
+
+### Extract the comment ID from the response and use it in the next request
+@new_comment_id = {{ create_new_comment.response.body.id }}
+
+### Update the comment to the post by author of the comment
+PATCH {{ host }}posts/{{ new_post_id }}/comments/{{ new_comment_id }}/
+Authorization: Token {{ achekhov_token }}
+Content-Type: application/json
+
+{
+    "text": "Updated Comment text"
+}
+
+### Delete comment created by author
+DELETE {{ host }}posts/{{ new_post_id }}/comments/6/
+Authorization: Token {{ achekhov_token }}
+
+### Update all comment to the post by author of the comment
+PUT {{ host }}posts/{{ new_post_id }}/comments/{{ new_comment_id }}/
+Authorization: Token {{ achekhov_token }}
+Content-Type: application/json
+
+{
+    "text": "Updated UPDATED 5 Comment text"
+}
